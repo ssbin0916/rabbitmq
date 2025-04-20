@@ -18,16 +18,9 @@ rabbitmq:
       name: sensor.exchange
     routing:
       key: sensor.data.#
-  chat:
-    queue:
-      name: chat.queue
-    exchange:
-      name: chat.exchange
-    routing:
-      key: room.*
+
 logging:
   level:
     root: INFO
     org.springframework: INFO
     com.example.rabbitmq: DEBUG
-    org.springframework.amqp: DEBUG
