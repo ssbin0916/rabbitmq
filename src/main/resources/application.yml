@@ -1,0 +1,33 @@
+spring:
+  jackson:
+    date-format: yyyy-MM-dd'T'HH:mm:ss
+    time-zone: Asia/Seoul
+
+rabbitmq:
+  host: localhost
+  port: 5672
+  username: guest
+  password: guest
+  virtual-host: /
+  stomp:
+    port: 61613
+  sensor:
+    queue:
+      name: sensor.queue
+    exchange:
+      name: sensor.exchange
+    routing:
+      key: sensor.data.#
+  chat:
+    queue:
+      name: chat.queue
+    exchange:
+      name: chat.exchange
+    routing:
+      key: room.*
+logging:
+  level:
+    root: INFO
+    org.springframework: INFO
+    com.example.rabbitmq: DEBUG
+    org.springframework.amqp: DEBUG

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Sensor Data Monitor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.0/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container {
+            width: 800px;
+            height: 400px;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="chart-container">
+        <canvas id="sensorChart"></canvas>
+    </div>
+
+    <script>
+        let chartData = {
+            labels: [],
+            temperatures: [],
+            humidities: []
+        };
+
+        // 차트 초기화
+        const ctx = document.getElementById('sensorChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    label: 'Temperature (°C)',
+                    data: chartData.temperatures,
+                    borderColor: 'rgb(255, 99, 132)',
+                    tension: 0.1
+                }, {
+                    label: 'Humidity (%)',
+                    data: chartData.humidities,
+                    borderColor: 'rgb(54, 162, 235)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // 웹소켓 연결
+        const socket = new SockJS('/sensor');  // '/chat/inbox'에서 '/sensor'로 변경
+        const stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function(frame) {
+            console.log('Connected: ' + frame);
+            stompClient.subscribe('/topic/sensor.data', function(message) {
+                const data = JSON.parse(message.body);
+                updateChart(data);
+            });
+        });
+
+        function updateChart(data) {
+            const time = new Date(data.timestamp).toLocaleTimeString();
+            
+            chartData.labels.push(time);
+            chartData.temperatures.push(data.temperature);
+            chartData.humidities.push(data.humidity);
+
+            // 최대 50개 데이터포인트만 유지
+            if (chartData.labels.length > 50) {
+                chartData.labels.shift();
+                chartData.temperatures.shift();
+                chartData.humidities.shift();
+            }
+
+            chart.update();
+        }
+    </script>
+</body>
+</html>
