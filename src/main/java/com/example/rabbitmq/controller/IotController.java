@@ -94,9 +94,9 @@ public class IotController {
 
         try {
             // 먼저 메시지를 데이터베이스에 저장
-            IotMessage savedMessage = iotService.saveMessage("iot/data", payload);
-            response.put("messageId", savedMessage.getId());
-            response.put("savedToDatabase", true);
+//            IotMessage savedMessage = iotService.saveMessage("iot/data", payload);
+//            response.put("messageId", savedMessage.getId());
+//            response.put("savedToDatabase", true);
 
             // 그 다음 MQTT로 전송 시도
             try {
