@@ -1,6 +1,5 @@
 package com.example.rabbitmq.service;
 
-import com.example.rabbitmq.dto.SensorData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -101,12 +100,10 @@ public class LoadTestService {
             final int messageId = sentMessagesCount.incrementAndGet();
             threadPool.submit(() -> {
                 try {
-                    // 임의의 센서 데이터 생성 및 전송
-                    String payload = createSensorDataPayload(messageId);
-                    rabbitMqService.sendMessage(payload);
+                    rabbitMqService.sendMessage(objectMapper.writeValueAsString(new Random().nextInt()));
                 } catch (Exception e) {
                     log.error("메시지 전송 실패 (ID: {}): {}", messageId, e.getMessage());
-                    sentMessagesCount.decrementAndGet(); // 실패한 메시지는 카운트에서 제외
+                    sentMessagesCount.decrementAndGet();
                 }
             });
         }
@@ -116,28 +113,6 @@ public class LoadTestService {
         log.info("메시지 배치 전송 완료: {}개, 소요시간: {}ms", batchSize, batchDuration);
     }
     
-    /**
-     * 센서 데이터 생성 및 JSON 변환
-     */
-    private String createSensorDataPayload(int id) {
-        try {
-            Random random = new Random();
-            SensorData sensorData = new SensorData(
-                    "sensor-" + (id % 100), // 100개의 센서 ID 순환
-                    20.0 + random.nextDouble() * 10.0, // 20~30도 사이 온도
-                    50.0 + random.nextDouble() * 30.0, // 50~80% 사이 습도
-                    LocalDateTime.now()
-            );
-            return objectMapper.writeValueAsString(sensorData);
-        } catch (Exception e) {
-            log.error("센서 데이터 생성 실패: {}", e.getMessage());
-            return "{}"; // 기본 빈 JSON 반환
-        }
-    }
-    
-    /**
-     * 테스트 시작/중지 API에서 호출할 수 있는 메소드
-     */
     public void setTestEnabled(boolean enabled) {
         this.enabled = enabled;
         if (enabled) {

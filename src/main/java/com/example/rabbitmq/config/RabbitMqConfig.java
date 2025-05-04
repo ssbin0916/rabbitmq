@@ -5,30 +5,45 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class RabbitMqConfig {
 
-    // MQTT 토픽을 매핑할 RabbitMQ 큐 이름
-    public static final String IOT_QUEUE = "iot.queue";
-    public static final String IOT_EXCHANGE = "iot.exchange";
-    public static final String IOT_ROUTING_KEY = "iot.data";
+    public static String QUEUE;
+    public static String EXCHANGE;
+    public static String ROUTING_KEY;
 
-    @Bean
-    public Queue iotQueue() {
-        return new Queue(IOT_QUEUE, true);
+    @Value("${spring.rabbitmq.queue}")
+    public void setQueue(String queue) {
+        QUEUE = queue;
+    }
+
+    @Value("${spring.rabbitmq.exchange}")
+    public void setExchange(String exchange) {
+        EXCHANGE = exchange;
+    }
+
+    @Value("${spring.rabbitmq.routing-key}")
+    public void setRoutingKey(String routingKey) {
+        ROUTING_KEY = routingKey;
     }
 
     @Bean
-    public TopicExchange iotExchange() {
-        return new TopicExchange(IOT_EXCHANGE);
+    public Queue queue() {
+        return new Queue(QUEUE, true);
     }
 
     @Bean
-    public Binding iotBinding(Queue iotQueue, TopicExchange iotExchange) {
-        return BindingBuilder.bind(iotQueue).to(iotExchange).with(IOT_ROUTING_KEY);
+    public TopicExchange exchange() {
+        return new TopicExchange(EXCHANGE);
+    }
+
+    @Bean
+    public Binding binding(Queue iotQueue, TopicExchange iotExchange) {
+        return BindingBuilder.bind(iotQueue).to(iotExchange).with(ROUTING_KEY);
     }
 
     @Bean
@@ -37,8 +52,8 @@ public class RabbitMqConfig {
     }
 
     @Bean
-    public AmqpTemplate amqpTemplate(ConnectionFactory connectionFactory) {
-        final RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
+        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
         rabbitTemplate.setMessageConverter(jsonMessageConverter());
         return rabbitTemplate;
     }
