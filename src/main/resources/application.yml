@@ -8,6 +8,12 @@ spring:
     routing-key: test.#
     queue: test
 
+  kafka:
+    bootstrap-servers: localhost:9092
+    topic: kafka-test-topic
+    consumer:
+      group-id: kafka-group
+      auto-offset-reset: earliest
 
 server:
   port: 8080
