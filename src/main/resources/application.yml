@@ -32,8 +32,8 @@ load:
   test:
     enabled: false
     messages-per-batch: 5000
-    batch-interval: 1000
-    duration-seconds: 10
+    batch-interval: 1000       # 1초마다 한 배치
+    duration-seconds: 86400    # 24시간 = 86,400초
     resource-check-interval: 5000
 
 mqtt:

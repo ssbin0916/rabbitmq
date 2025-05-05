@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.*;
 
 import java.util.HashMap;
@@ -67,8 +68,21 @@ public class KafkaConfig {
         return factory;
     }
 
+//    @Bean
+//    public NewTopic topic() {
+//        return new NewTopic(topic, 8, (short) 1); // 파티션 8개
+//    }
+
     @Bean
     public NewTopic topic() {
-        return new NewTopic(topic, 1, (short) 1); // Topic name, partition, replication factor
+        Map<String, String> configs = new HashMap<>();
+        configs.put("retention.bytes", String.valueOf(100_000_000_000L)); // 100GB (파티션당)
+
+        return TopicBuilder.name(topic)
+                .partitions(8)    // 8개 파티션 → 총 800GB까지 저장 가능
+                .replicas(1)
+                .configs(configs)
+                .build();
     }
+
 }

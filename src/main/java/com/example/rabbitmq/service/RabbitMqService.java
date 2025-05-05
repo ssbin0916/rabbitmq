@@ -16,6 +16,7 @@ public class RabbitMqService {
 
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
+    private final KafkaService kafkaService;
 
     // RabbitMQ로 메시지 발송
     public void sendMessage(String message) {
@@ -29,6 +30,6 @@ public class RabbitMqService {
     // RabbitMQ에서 메시지 수신
     @RabbitListener(queues = "${spring.rabbitmq.queue}")
     public void receiveMessage(String message) throws JsonProcessingException {
-
+        kafkaService.sendMessage("kafka-test-topic", message);
     }
 }
