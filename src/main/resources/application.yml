@@ -1,37 +1,20 @@
-# MQTT \uC124\uC815
-mqtt:
-  broker:
-    url: tcp://localhost:1883
-  client:
-    id: iotApp
-  topic: iot/data
-  qos: 1
-  clean-session: false
-
-# RabbitMQ \uC124\uC815
 spring:
   rabbitmq:
     host: localhost
     port: 5672
     username: guest
     password: guest
-    
-  # \uB370\uC774\uD130\uBCA0\uC774\uC2A4 \uC124\uC815
-  datasource:
-    url: jdbc:mysql://localhost:3306/test?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: root
-    password: root
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    database-platform: org.hibernate.dialect.MySQL8Dialect
-    properties:
-      hibernate:
-        format_sql: true
-        dialect: org.hibernate.dialect.MySQL8Dialect
+    exchange: amq.topic
+    routing-key: test.#
+    queue: test
 
-# \uC11C\uBC84 \uC124\uC815
+  kafka:
+    bootstrap-servers: localhost:9092
+    topic: kafka-test-topic
+    consumer:
+      group-id: kafka-group
+      auto-offset-reset: earliest
+
 server:
   port: 8080
   jackson:
@@ -44,3 +27,18 @@ logging:
     org.springframework: INFO
     com.example.rabbitmq: DEBUG
     org.hibernate.SQL: DEBUG
+
+load:
+  test:
+    enabled: false
+    messages-per-batch: 5000
+    batch-interval: 1000       # 1초마다 한 배치
+    duration-seconds: 86400    # 24시간 = 86,400초
+    resource-check-interval: 5000
+
+mqtt:
+  broker-url: tcp://localhost:1883
+  client-id: client
+  topic: test
+  qos: 1
+  clean-session: false
