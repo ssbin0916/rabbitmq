@@ -1,7 +1,6 @@
 package com.example.rabbitmq.config;
 
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,34 +19,32 @@ import org.springframework.messaging.MessageHandler;
 public class MqttConfig {
 
     @Value("${mqtt.broker-url}")
-    private String brokerUrl; // MQTT 브로커 주소 (ex. tcp://localhost:1883)
+    private String brokerUrl;
 
     @Value("${mqtt.client-id}")
-    private String clientId; // 클라이언트 ID (수신/발신용으로 나누어 사용)
+    private String clientId;
 
     @Value("${mqtt.topic}")
-    private String topic; // 구독 및 발행에 사용할 기본 토픽
+    private String topic;
 
     @Value("${mqtt.qos}")
-    private int qos; // QoS (0: at most once, 1: at least once, 2: exactly once)
+    private int qos;
 
     @Value("${mqtt.clean-session}")
-    private boolean cleanSession; // 클린 세션 설정 (true면 연결 종료 시 구독 정보 제거)
+    private boolean cleanSession;
 
-    /**
-     * MQTT 연결에 사용할 클라이언트 팩토리 설정입니다.
-     * 연결 옵션(브로커 주소, 세션, 재연결 등)을 지정합니다.
-     */
     @Bean
     public MqttPahoClientFactory mqttClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
 
         MqttConnectOptions options = new MqttConnectOptions();
-        options.setServerURIs(new String[]{brokerUrl}); // 연결할 브로커 주소
-        options.setCleanSession(cleanSession); // 클린 세션 설정
-        options.setKeepAliveInterval(90); // 연결 유지 간격 (초)
-        options.setAutomaticReconnect(true); // 자동 재연결 설정
-        options.setConnectionTimeout(30); // 연결 타임아웃 (초)
+        options.setServerURIs(new String[]{brokerUrl});
+        options.setCleanSession(cleanSession);
+        options.setKeepAliveInterval(90);
+        options.setAutomaticReconnect(true);
+        options.setConnectionTimeout(30);
+
+        options.setMaxInflight(5000);
 
         factory.setConnectionOptions(options);
         return factory;
@@ -55,7 +52,7 @@ public class MqttConfig {
 
     @Bean
     public MessageChannel mqttInputChannel() {
-        return new DirectChannel(); // 단순하게 메시지를 한 소비자로 전달
+        return new DirectChannel();
     }
 
     @Bean
@@ -76,11 +73,12 @@ public class MqttConfig {
     }
 
     @Bean
+    @ServiceActivator(inputChannel = "mqttOutboundChannel")
     public MessageHandler mqttOutbound() {
         MqttPahoMessageHandler messageHandler =
                 new MqttPahoMessageHandler(clientId + "-out", mqttClientFactory());
 
-        messageHandler.setAsync(true);
+        messageHandler.setAsync(false);
         messageHandler.setDefaultTopic(topic);
         messageHandler.setDefaultQos(qos);
 

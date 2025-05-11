@@ -21,7 +21,7 @@ public class LoadTestController {
      * 부하 테스트 시작/중지
      */
     @PostMapping("/load")
-    public ResponseEntity<Map<String, Object>> controlLoadTest(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<Map<String, Object>> controlLoadTest(@RequestBody Map<String, Object> request) throws Exception {
         Boolean enabled = (Boolean) request.get("enabled");
         Map<String, Object> response = new HashMap<>();
         
