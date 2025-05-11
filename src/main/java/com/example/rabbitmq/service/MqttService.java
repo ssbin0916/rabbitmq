@@ -6,13 +6,10 @@ import org.springframework.integration.mqtt.support.MqttHeaders;
 import org.springframework.integration.support.MessageBuilder;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
@@ -53,13 +50,10 @@ public class MqttService {
                         .build();
                 mqttOutboundChannel.send(msg);
                 long bytes = payload.getBytes(StandardCharsets.UTF_8).length;
-                long cnt   = sentCount.incrementAndGet();
+                sentCount.incrementAndGet();
                 sentBytes.addAndGet(bytes);
 
-                if (cnt % 1000 == 0) {
-                    log.info("[MQTT] 누적 전송: {}건, {} bytes", cnt, sentBytes.get());
-                }
-            } catch(Exception ex) {
+            } catch (Exception ex) {
                 log.error("[MQTT] 전송 실패: {}", ex.toString());
             }
         });

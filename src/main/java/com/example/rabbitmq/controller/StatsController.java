@@ -27,8 +27,6 @@ public class StatsController {
         // MQTT → RabbitMQ
         m.put("mqtt.sent.count",       mqttService.getSentCount());
         m.put("mqtt.sent.bytes",       mqttService.getSentBytes());
-        m.put("rabbit.received.count", rabbitMqService.getReceivedCount());
-        m.put("rabbit.received.bytes", rabbitMqService.getReceivedBytes());
         m.put("rabbit.sent.count",     rabbitMqService.getSentCount());
         m.put("rabbit.sent.bytes",     rabbitMqService.getSentBytes());
 

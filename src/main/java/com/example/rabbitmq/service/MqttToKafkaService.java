@@ -42,11 +42,8 @@ public class MqttToKafkaService {
             @Header(AmqpHeaders.DELIVERY_TAG) long tag
     ) throws IOException {
         // 수신 통계 업데이트
-        long receiveCount = rabbitReceivedCount.incrementAndGet();
-        long receiveBytes = rabbitReceivedBytes.addAndGet(message.getBytes(UTF_8).length);
-        if (receiveCount % 1000 == 0) {
-            log.info("[Rabbit][수신] 누적: {}건, {} bytes", receiveCount, receiveBytes);
-        }
+        rabbitReceivedCount.incrementAndGet();
+        rabbitReceivedBytes.addAndGet(message.getBytes(UTF_8).length);
 
 
 //        try {
@@ -106,29 +103,23 @@ public class MqttToKafkaService {
         }
 
         // 3) Kafka 전송 통계
-        long sc = kafkaSentCount.incrementAndGet();
-        long sb = kafkaSentBytes.addAndGet(message.getBytes(UTF_8).length);
-        if (sc % 1000 == 0) {
-            log.info("[Kafka][전송] 누적={}건, {}B", sc, sb);
-        }
-    }
+        kafkaSentCount.incrementAndGet();
+        kafkaSentBytes.addAndGet(message.getBytes(UTF_8).length);
 
-    @Scheduled(fixedRate = 5_000)
-    public void report() {
-        log.info("[Pipeline][5s] Rabbit→Kafka 수신={}건({}B), 전송={}건({}B)",
-                rabbitReceivedCount.get(), rabbitReceivedBytes.get(),
-                kafkaSentCount.get(),       kafkaSentBytes.get());
     }
 
     public long getRabbitReceivedCount() {
         return rabbitReceivedCount.get();
     }
+
     public long getRabbitReceivedBytes() {
         return rabbitReceivedBytes.get();
     }
+
     public long getKafkaSentCount() {
         return kafkaSentCount.get();
     }
+
     public long getKafkaSentBytes() {
         return kafkaSentBytes.get();
     }

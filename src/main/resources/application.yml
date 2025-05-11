@@ -33,10 +33,9 @@ logging:
 load:
   test:
     enabled: false
-    messages-per-batch: 5000
-    batch-interval: 1000       # 1초마다 한 배치
-    duration-seconds: 300    # 24시간 = 86,400초
-    resource-check-interval: 5000
+    messages-per-batch: 1000
+    batch-interval: 200
+    duration-seconds: 60
 
 mqtt:
   broker-url: tcp://localhost:1883

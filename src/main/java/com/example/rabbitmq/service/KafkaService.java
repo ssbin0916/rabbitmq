@@ -16,7 +16,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public class KafkaService {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
-    private final MetricsService metricsService;
 
     private final AtomicLong receivedCount = new AtomicLong();
     private final AtomicLong receivedBytes = new AtomicLong();
@@ -27,18 +26,8 @@ public class KafkaService {
 
     @KafkaListener(topics = "${spring.kafka.topic}", groupId = "${spring.kafka.consumer.group-id}", containerFactory = "kafkaListenerContainerFactory")
     public void consumeMessage(String message) {
-        long count = receivedCount.incrementAndGet();
-        long bytes = receivedBytes.addAndGet(message.getBytes(StandardCharsets.UTF_8).length);
-
-        if (count % 1000 == 0) {
-            log.info("[Kafka] 누적 수신: {}건, {} bytes", count, bytes);
-        }
-    }
-
-    @Scheduled(fixedRate = 5000)
-    public void report() {
-        log.info("[Kafka][5s] 수신 총계: {}건, {} bytes",
-                receivedCount.get(), receivedBytes.get());
+        receivedCount.incrementAndGet();
+        receivedBytes.addAndGet(message.getBytes(StandardCharsets.UTF_8).length);
     }
 
     public long getReceivedCount() {
