@@ -14,8 +14,8 @@ spring:
     consumer:
       group-id: kafka-group
       auto-offset-reset: earliest
-      enable-auto-commit: true
-      auto-commit-interval: 100
+#      enable-auto-commit: true
+#      auto-commit-interval: 100
 
 server:
   port: 8080

@@ -28,13 +28,20 @@ public class KafkaConfig {
     @Value("${spring.kafka.topic}")
     private String topic;
 
+    @Value("${spring.kafka.consumer.group-id}")
+    private String groupId;
+
     @Bean
     public Map<String, Object> producerConfigs() {
-        Map<String, Object> configProps = new HashMap<>();
-        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        return configProps;
+        Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        // Enable idempotence for exactly-once producer semantics
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.RETRIES_CONFIG, Integer.MAX_VALUE);
+        return props;
     }
 
     @Bean
@@ -51,9 +58,13 @@ public class KafkaConfig {
     public Map<String, Object> consumerConfigs() {
         Map<String, Object> configProps = new HashMap<>();
         configProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        configProps.put(ConsumerConfig.GROUP_ID_CONFIG, "group_id");
+        configProps.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         configProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         configProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        // Disable auto-commit as we'll use manual ack
+        configProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+        // Set isolation level to prevent reading uncommitted messages
+        configProps.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
         return configProps;
     }
 
@@ -69,9 +80,10 @@ public class KafkaConfig {
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
-        factory.setConcurrency(8);              // 8 스레드로 분산 소비
+        factory.setConcurrency(8);
         factory.getContainerProperties().setPollTimeout(3000);
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.BATCH);
+        // Use MANUAL acknowledgment for better control
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         return factory;
     }
 
@@ -80,7 +92,7 @@ public class KafkaConfig {
         long retentionMs = Duration.ofDays(1).toMillis();
         Map<String, String> configs = new HashMap<>();
         configs.put("retention.ms", String.valueOf(retentionMs));
-//        configs.put("retention.bytes", String.valueOf(100_000_000_000L)); // 100GB (파티션당)
+//        configs.put("retention.bytes", String.valueOf(100_000_000_000L)); // 100GB (per partition)
 
         return TopicBuilder.name(topic)
                 .partitions(8)

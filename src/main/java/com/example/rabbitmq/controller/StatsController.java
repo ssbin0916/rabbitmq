@@ -4,6 +4,7 @@ import com.example.rabbitmq.service.KafkaService;
 import com.example.rabbitmq.service.MqttService;
 import com.example.rabbitmq.service.MqttToKafkaService;
 import com.example.rabbitmq.service.RabbitMqService;
+import com.example.rabbitmq.util.StatsCollector;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,26 +20,31 @@ public class StatsController {
     private final RabbitMqService rabbitMqService;
     private final MqttToKafkaService pipelineService;
     private final KafkaService kafkaService;
+    private final StatsCollector rates;
 
     /** 전체 통계 조회 */
     @GetMapping
     public Map<String, Object> allStats() {
         Map<String, Object> m = new LinkedHashMap<>();
-        // MQTT → RabbitMQ
-        m.put("mqtt.sent.count",       mqttService.getSentCount());
-        m.put("mqtt.sent.bytes",       mqttService.getSentBytes());
-        m.put("rabbit.sent.count",     rabbitMqService.getSentCount());
-        m.put("rabbit.sent.bytes",     rabbitMqService.getSentBytes());
 
-        // RabbitMQ → Kafka (Pipeline)
-        m.put("pipeline.received.count", pipelineService.getRabbitReceivedCount());
-        m.put("pipeline.received.bytes", pipelineService.getRabbitReceivedBytes());
-        m.put("pipeline.sent.count",     pipelineService.getKafkaSentCount());
-        m.put("pipeline.sent.bytes",     pipelineService.getKafkaSentBytes());
+        // MQTT
+        m.put("mqtt.sent.count",   mqttService.getSentCount());
+        m.put("mqtt.sent.bytes",   mqttService.getSentBytes());
+        m.put("mqtt.rate.count/s", rates.getMqttRateCount());
+        m.put("mqtt.rate.bytes/s", rates.getMqttRateBytes());
 
-        // Kafka 최종 수신
-        m.put("kafka.received.count",  kafkaService.getReceivedCount());
-        m.put("kafka.received.bytes",  kafkaService.getReceivedBytes());
+        // RabbitMQ
+        m.put("rabbit.sent.count", rabbitMqService.getSentCount());
+        m.put("rabbit.sent.bytes", rabbitMqService.getSentBytes());
+        m.put("rabbit.rate.count/s", rates.getRabbitRateCount());
+        m.put("rabbit.rate.bytes/s", rates.getRabbitRateBytes());
+
+        // Kafka
+        m.put("kafka.received.count", kafkaService.getReceivedCount());
+        m.put("kafka.received.bytes", kafkaService.getReceivedBytes());
+        m.put("kafka.rate.count/s",    rates.getKafkaRateCount());
+        m.put("kafka.rate.bytes/s",    rates.getKafkaRateBytes());
+
         return m;
     }
 

@@ -94,7 +94,7 @@ public class MqttToKafkaService {
 //        }
 
         try {
-            kafkaTemplate.send(kafkaTopic, message).get();  // 블로킹
+            kafkaTemplate.send(kafkaTopic, message).get();
             channel.basicAck(tag, false);
         } catch (Exception ex) {
             log.error("[Kafka 전송 실패] {}", ex.toString());

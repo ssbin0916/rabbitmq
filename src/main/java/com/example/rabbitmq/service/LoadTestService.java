@@ -10,13 +10,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
@@ -25,96 +22,95 @@ import java.util.concurrent.atomic.AtomicLong;
 public class LoadTestService {
 
     private final MqttService mqttService;
-    private final RabbitMqService rabbitMqService;
-    private final KafkaService kafkaService;
     private final ObjectMapper objectMapper;
 
-    // 테스트 활성화 여부 - 기본적으로 비활성화, application.yml에서 설정 가능
-    @Value("${load.test.enabled}")
+    @Value("${load.test.enabled:false}")
     private boolean enabled;
 
-    @Value("${load.test.messages-per-batch:5000}")
+    @Value("${load.test.messages-per-batch:1000}")
     private int messagesPerBatch;
-    
-    @Value("${load.test.batch-interval:1000}")
-    private int batchInterval;
-    
-    @Value("${load.test.duration-seconds}")
+
+    @Value("${load.test.batch-interval:200}")
+    private int batchInterval;   // ms
+
+    @Value("${load.test.duration-seconds:60}")
     private int testDurationSeconds;
-    
-    private LocalDateTime testStartTime;
-    
-    private AtomicInteger sentMessagesCount = new AtomicInteger(0);
-    private final ExecutorService threadPool = Executors.newFixedThreadPool(10);
+
+    // 미리 만들어둘 메시지 풀
+    private List<String> preGenerated;
+
+    // 비동기 전송 전용 풀 (IO 바운드라면 코어×2~×4 정도)
+    private final ExecutorService sendPool =
+            Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 3);
+
+    private LocalDateTime startTime;
+    private final AtomicLong sendCount = new AtomicLong();
 
     @PostConstruct
-    public void init() {
+    public void init() throws Exception {
         if (enabled) {
-            testStartTime = LocalDateTime.now();
-            log.info("애플리케이션 시작 시 부하 테스트가 활성화되어 있으므로 testStartTime을 초기화합니다: {}", testStartTime);
+            preGenerateMessages();
+            log.info("▶ 메시지 풀 생성 완료 (batchSize={})", messagesPerBatch);
         }
     }
 
-    AtomicLong sendCount = new AtomicLong(0);
-
-    @Scheduled(fixedRate = 200) // 0.2초 간격으로 실행
-    public void sendBatchMessages() {
-        if (!enabled) {
-            return;
-        }
-
-        LocalDateTime start = LocalDateTime.now();
-
-        // 테스트 시작 시간 설정
-        if (testStartTime == null) {
-            testStartTime = LocalDateTime.now();
-            log.info("부하 테스트 시작: {}ms 간격으로 메시지를 MQTT에 전송합니다.", batchInterval);
-        }
-
-        if (LocalDateTime.now().isAfter(testStartTime.plusSeconds(testDurationSeconds))) {
-            enabled = false;
-            return;
-        }
-
-        for (int i = 0; i < 1000; i++) {
-            try {
-                String id = UUID.randomUUID().toString();
-
-                Map<String, Object> row = new HashMap<>();
-                row.put("id", id);
-                Random random = new Random();
-                for (int col = 1; col <= 199; col++) {
-                    row.put("col" + col, random.nextDouble());
-                }
-
-                // MQTT 메시지 전송
-                String message = objectMapper.writeValueAsString(row);
-//                rabbitMqService.sendMessage(message);
-
-                mqttService.sendMessage("test", message);
-                sendCount.incrementAndGet();
-            } catch (Exception e) {
-                log.error("메시지 생성/전송 중 오류: {}", e.getMessage());
+    private void preGenerateMessages() throws Exception {
+        preGenerated = new ArrayList<>(messagesPerBatch);
+        Random rnd = new Random();
+        for (int i = 0; i < messagesPerBatch; i++) {
+            Map<String,Object> row = new HashMap<>();
+            row.put("id", UUID.randomUUID().toString());
+            for (int c = 1; c <= 199; c++) {
+                row.put("col"+c, rnd.nextDouble());
             }
+            preGenerated.add(objectMapper.writeValueAsString(row));
+        }
+    }
+
+    @Scheduled(fixedRateString = "${load.test.batch-interval}")
+    public void sendBatchMessages() {
+        if (!enabled) return;
+
+        if (startTime == null) {
+            startTime = LocalDateTime.now();
+            log.info("▶ 부하 테스트 시작: duration={}초, batchSize={}", testDurationSeconds, messagesPerBatch);
         }
 
-        Duration elapsed = Duration.between(start, LocalDateTime.now());
-        log.info("메시지 전송 완료: 1000개, 실행 시간: {}ms", elapsed.toMillis());
-    }
-    
-    public void setTestEnabled(boolean enabled) {
-        this.enabled = enabled;
-        if (enabled) {
-            // 테스트 시작 시 카운터 초기화
-            mqttService.reset();
-            rabbitMqService.reset();
-            kafkaService.reset();
+        // 종료 체크
+        if (Duration.between(startTime, LocalDateTime.now()).getSeconds() >= testDurationSeconds) {
+            enabled = false;
+            long elapsed = Duration.between(startTime, LocalDateTime.now()).getSeconds();
+            log.info("▶ 부하 테스트 종료: 실제경과={}초, 총전송={}건", elapsed, sendCount.get());
+            return;
+        }
 
-            testStartTime = null;
-            sentMessagesCount.set(0);
-            log.info("부하 테스트가 활성화되었습니다. 다음 스케줄링 주기에 시작됩니다.");
+        long batchStart = System.currentTimeMillis();
+        // 비동기로만 던지고 리턴
+        for (int i = 0; i < preGenerated.size(); i++) {
+            final String payload = preGenerated.get(i);
+            sendPool.execute(() -> {
+                try {
+                    mqttService.sendMessage("test", payload);
+                    sendCount.incrementAndGet();
+                } catch (Exception e) {
+                    log.error("전송 실패", e);
+                }
+            });
+        }
+        long elapsed = System.currentTimeMillis() - batchStart;
+        log.info("메시지 요청 던짐: {}개, scheduling 시간={}ms (누적 전송 요청={}건)",
+                messagesPerBatch, elapsed, sendCount.get());
+    }
+
+    public void setTestEnabled(boolean on) throws Exception {
+        this.enabled = on;
+        if (on) {
+            sendCount.set(0);
+            startTime = null;
+            preGenerateMessages();
+            log.info("▶ 부하 테스트 켜짐 (재시작 준비)");
         } else {
-            log.info("부하 테스트가 비활성화되었습니다.");
+            log.info("▶ 부하 테스트 꺼짐");
         }
     }
 
@@ -122,8 +118,7 @@ public class LoadTestService {
         return enabled;
     }
 
-    public int getSentMessagesCount() {
-        return sentMessagesCount.get();
+    public long getSentMessagesCount() {
+        return sendCount.get();
     }
-
 }
