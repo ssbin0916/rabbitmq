@@ -68,7 +68,11 @@ public class RabbitMqConfig {
 
         factory.setConcurrentConsumers(8);
         factory.setMaxConcurrentConsumers(8);
-        factory.setPrefetchCount(200);
+
+//        factory.setBatchListener(true);
+//        factory.setBatchSize(500);
+
+        factory.setPrefetchCount(1000);
         factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
 
         // JSON 컨버터를 제거했으므로 기본 SimpleMessageConverter 가 사용됩니다.

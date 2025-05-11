@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 
@@ -48,9 +49,6 @@ public class TopicAdminService {
         }
     }
 
-    /**
-     * 토픽을 삭제 후 동일 설정으로 재생성.
-     */
     public void recreateTopic() {
         try {
             DeleteTopicsResult deleteTopics = adminClient.deleteTopics(
@@ -62,7 +60,9 @@ public class TopicAdminService {
             NewTopic newTopic = TopicBuilder.name(topicName)
                     .partitions(8)
                     .replicas((short) 1)
+                    .config("retention.ms", String.valueOf(Duration.ofDays(1).toMillis()))
                     .build();
+
             CreateTopicsResult createTopics = adminClient.createTopics(
                     Collections.singletonList(newTopic)
             );

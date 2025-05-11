@@ -5,10 +5,7 @@ import com.example.rabbitmq.service.MqttService;
 import com.example.rabbitmq.service.MqttToKafkaService;
 import com.example.rabbitmq.service.RabbitMqService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -20,8 +17,8 @@ public class StatsController {
 
     private final MqttService mqttService;
     private final RabbitMqService rabbitMqService;
-    private final KafkaService kafkaService;
     private final MqttToKafkaService pipelineService;
+    private final KafkaService kafkaService;
 
     /** 전체 통계 조회 */
     @GetMapping
@@ -36,10 +33,10 @@ public class StatsController {
         m.put("rabbit.sent.bytes",     rabbitMqService.getSentBytes());
 
         // RabbitMQ → Kafka (Pipeline)
-        m.put("pipeline.received.count", pipelineService.getReceivedCount());
-        m.put("pipeline.received.bytes", pipelineService.getReceivedBytes());
-        m.put("pipeline.sent.count",     pipelineService.getSentCount());
-        m.put("pipeline.sent.bytes",     pipelineService.getSentBytes());
+        m.put("pipeline.received.count", pipelineService.getRabbitReceivedCount());
+        m.put("pipeline.received.bytes", pipelineService.getRabbitReceivedBytes());
+        m.put("pipeline.sent.count",     pipelineService.getKafkaSentCount());
+        m.put("pipeline.sent.bytes",     pipelineService.getKafkaSentBytes());
 
         // Kafka 최종 수신
         m.put("kafka.received.count",  kafkaService.getReceivedCount());
@@ -67,14 +64,14 @@ public class StatsController {
         );
     }
 
-    /** Pipeline (Rabbit → Kafka) 통계 조회 */
+    /** Pipeline (Rabbit→Kafka) 통계 조회 */
     @GetMapping("/pipeline")
     public Map<String, Long> pipelineStats() {
         return Map.of(
-                "receivedCount", pipelineService.getReceivedCount(),
-                "receivedBytes", pipelineService.getReceivedBytes(),
-                "sentCount",     pipelineService.getSentCount(),
-                "sentBytes",     pipelineService.getSentBytes()
+                "receivedCount", pipelineService.getRabbitReceivedCount(),
+                "receivedBytes", pipelineService.getRabbitReceivedBytes(),
+                "sentCount",     pipelineService.getKafkaSentCount(),
+                "sentBytes",     pipelineService.getKafkaSentBytes()
         );
     }
 

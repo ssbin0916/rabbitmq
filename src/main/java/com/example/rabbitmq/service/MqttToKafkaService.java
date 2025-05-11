@@ -12,8 +12,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicLong;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 @Slf4j
 @Service
@@ -25,19 +26,11 @@ public class MqttToKafkaService {
     @Value("${spring.kafka.topic}")
     private String kafkaTopic;
 
-    private final AtomicLong receivedCount = new AtomicLong();
-    private final AtomicLong receivedBytes = new AtomicLong();
-    private final AtomicLong sentCount = new AtomicLong();
-    private final AtomicLong sentBytes = new AtomicLong();
-
-//    @RabbitListener(queues = "${spring.rabbitmq.queue}", containerFactory = "rabbitListenerContainerFactory")
-//    public void consumeFromMqttAndProduceToKafka(String message) {
-//        try {
-//            kafkaTemplate.send("kafka-test-topic", message);
-//        } catch (Exception e) {
-//            log.error("Kafka 전송 실패: {}", e.getMessage());
-//        }
-//    }
+    private final AtomicLong rabbitReceivedCount = new AtomicLong();
+    private final AtomicLong rabbitReceivedBytes = new AtomicLong();
+    // Kafka 전송 통계
+    private final AtomicLong kafkaSentCount = new AtomicLong();
+    private final AtomicLong kafkaSentBytes = new AtomicLong();
 
     @RabbitListener(
             queues = "${spring.rabbitmq.queue}",
@@ -49,73 +42,102 @@ public class MqttToKafkaService {
             @Header(AmqpHeaders.DELIVERY_TAG) long tag
     ) throws IOException {
         // 수신 통계 업데이트
-        long receiveCount = receivedCount.incrementAndGet();
-        long receiveBytes = receivedBytes.addAndGet(message.getBytes(StandardCharsets.UTF_8).length);
+        long receiveCount = rabbitReceivedCount.incrementAndGet();
+        long receiveBytes = rabbitReceivedBytes.addAndGet(message.getBytes(UTF_8).length);
         if (receiveCount % 1000 == 0) {
             log.info("[Rabbit][수신] 누적: {}건, {} bytes", receiveCount, receiveBytes);
         }
 
+
+//        try {
+//            // Kafka로 비동기 전송 (CompletableFuture API)
+//            kafkaTemplate.send(kafkaTopic, message)
+//                    .whenComplete((result, ex) -> {
+//                        if (ex != null) {
+//                            log.error("[Kafka][전송 실패] {}", ex.toString());
+//                            try {
+//                                channel.basicNack(tag, false, true);
+//                            } catch (IOException e) {
+//                                log.error("[Rabbit][NACK 실패] {}", e.toString());
+//                            }
+//                        } else {
+//                            try {
+//                                channel.basicAck(tag, false);
+//                            } catch (IOException e) {
+//                                log.error("[Rabbit][ACK 실패] {}", e.toString());
+//                            }
+//                            long sentCount = this.sentCount.incrementAndGet();
+//                            long sentBytes = this.sentBytes.addAndGet(message.getBytes(StandardCharsets.UTF_8).length);
+//                            if (sentCount % 1000 == 0) {
+//                                log.info("[Kafka][전송] 누적: {}건, {} bytes", sentCount, sentBytes);
+//                            }
+//                        }
+//                    });
+//        } catch (Exception e) {
+//            log.error("Kafka 전송 예외:", e);
+//            channel.basicNack(tag, false, true);
+//        }
+
+//        try {
+//            // 2) 동기 Kafka 전송
+//            kafkaTemplate.send(kafkaTopic, message).get();
+//
+//            // 3) ACK
+//            channel.basicAck(tag, false);
+//
+//            // 4) 전송 통계
+//            long sc = sentCount.incrementAndGet();
+//            long sb = sentBytes.addAndGet(message.getBytes(StandardCharsets.UTF_8).length);
+//            if (sc % 1000 == 0) {
+//                log.info("[Kafka][전송] 누적: {}건, {} bytes", sc, sb);
+//            }
+//        } catch (Exception e) {
+//            log.error("[Kafka 전송 실패] {}", e.toString());
+//            channel.basicNack(tag, false, true);
+//        }
+
         try {
-            // Kafka로 비동기 전송 (CompletableFuture API)
-            kafkaTemplate.send(kafkaTopic, message)
-                    .whenComplete((result, ex) -> {
-                        if (ex != null) {
-                            log.error("[Kafka][전송 실패] {}", ex.toString());
-                            try {
-                                channel.basicNack(tag, false, true);
-                            } catch (IOException e) {
-                                log.error("[Rabbit][NACK 실패] {}", e.toString());
-                            }
-                        } else {
-                            try {
-                                channel.basicAck(tag, false);
-                            } catch (IOException e) {
-                                log.error("[Rabbit][ACK 실패] {}", e.toString());
-                            }
-                            long sc = sentCount.incrementAndGet();
-                            long sb = sentBytes.addAndGet(message.getBytes(StandardCharsets.UTF_8).length);
-                            if (sc % 1000 == 0) {
-                                log.info("[Kafka][전송] 누적: {}건, {} bytes", sc, sb);
-                            }
-                        }
-                    });
-        } catch (Exception e) {
-            log.error("Kafka 전송 예외:", e);
+            kafkaTemplate.send(kafkaTopic, message).get();  // 블로킹
+            channel.basicAck(tag, false);
+        } catch (Exception ex) {
+            log.error("[Kafka 전송 실패] {}", ex.toString());
             channel.basicNack(tag, false, true);
+            return;
+        }
+
+        // 3) Kafka 전송 통계
+        long sc = kafkaSentCount.incrementAndGet();
+        long sb = kafkaSentBytes.addAndGet(message.getBytes(UTF_8).length);
+        if (sc % 1000 == 0) {
+            log.info("[Kafka][전송] 누적={}건, {}B", sc, sb);
         }
     }
 
-    /**
-     * 5초마다 수신/전송 통계 로그를 출력합니다.
-     */
-    @Scheduled(fixedRate = 5000)
+    @Scheduled(fixedRate = 5_000)
     public void report() {
         log.info("[Pipeline][5s] Rabbit→Kafka 수신={}건({}B), 전송={}건({}B)",
-                receivedCount.get(), receivedBytes.get(),
-                sentCount.get(), sentBytes.get());
+                rabbitReceivedCount.get(), rabbitReceivedBytes.get(),
+                kafkaSentCount.get(),       kafkaSentBytes.get());
     }
 
-    public long getReceivedCount() {
-        return receivedCount.get();
+    public long getRabbitReceivedCount() {
+        return rabbitReceivedCount.get();
     }
-
-    public long getReceivedBytes() {
-        return receivedBytes.get();
+    public long getRabbitReceivedBytes() {
+        return rabbitReceivedBytes.get();
     }
-
-    public long getSentCount() {
-        return sentCount.get();
+    public long getKafkaSentCount() {
+        return kafkaSentCount.get();
     }
-
-    public long getSentBytes() {
-        return sentBytes.get();
+    public long getKafkaSentBytes() {
+        return kafkaSentBytes.get();
     }
 
     public void reset() {
-        receivedCount.set(0);
-        receivedBytes.set(0);
-        sentCount.set(0);
-        sentBytes.set(0);
+        rabbitReceivedCount.set(0);
+        rabbitReceivedBytes.set(0);
+        kafkaSentCount.set(0);
+        kafkaSentBytes.set(0);
     }
 
 }
