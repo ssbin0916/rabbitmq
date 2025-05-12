@@ -3,7 +3,6 @@ package com.example.rabbitmq.util;
 import com.example.rabbitmq.service.KafkaService;
 import com.example.rabbitmq.service.MqttService;
 import com.example.rabbitmq.service.MqttToKafkaService;
-import com.example.rabbitmq.service.RabbitMqService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -17,68 +16,55 @@ import java.util.concurrent.atomic.AtomicLong;
 public class StatsCollector {
 
     private final MqttService mqttService;
-    private final RabbitMqService rabbitMqService;
     private final MqttToKafkaService mqttToKafkaService;
     private final KafkaService kafkaService;
 
-    private long prevMqttCount = 0, prevMqttBytes = 0;
-    private long prevRabbitCount = 0, prevRabbitBytes = 0;
-    private long prevPipelineCount = 0, prevPipelineBytes = 0;
-    private long prevKafkaCount = 0, prevKafkaBytes = 0;
+    private long prevMqttCnt;
+    private long prevRabbitCnt;
+    private long prevPipelineCnt;
+    private long prevKafkaCnt;
     private Instant prevTime = Instant.now();
 
-    private final AtomicLong mqttRateCnt = new AtomicLong();
-    private final AtomicLong mqttRateBytes = new AtomicLong();
-    private final AtomicLong rabbitRateCnt = new AtomicLong();
-    private final AtomicLong rabbitRateBytes = new AtomicLong();
+    private final AtomicLong mqttRateCnt     = new AtomicLong();
+    private final AtomicLong rabbitRateCnt   = new AtomicLong();
     private final AtomicLong pipelineRateCnt = new AtomicLong();
-    private final AtomicLong pipelineRateBytes = new AtomicLong();
-    private final AtomicLong kafkaRateCnt = new AtomicLong();
-    private final AtomicLong kafkaRateBytes = new AtomicLong();
+    private final AtomicLong kafkaRateCnt    = new AtomicLong();
 
     @PostConstruct
     public void init() {
-        prevMqttCount = mqttService.getSentCount();
-        prevMqttBytes = mqttService.getSentBytes();
-        prevRabbitCount = mqttToKafkaService.getRabbitReceivedCount();
-        prevRabbitBytes = rabbitMqService.getSentBytes();
-        prevKafkaCount = kafkaService.getReceivedCount();
-        prevKafkaBytes = kafkaService.getReceivedBytes();
+        prevMqttCnt     = mqttService.getSentCount();
+        prevRabbitCnt   = mqttToKafkaService.getRabbitReceivedCount();
+        prevPipelineCnt = mqttToKafkaService.getKafkaSentCount();
+        prevKafkaCnt    = kafkaService.getReceivedCount();
     }
 
     @Scheduled(fixedRate = 1000)
     public void sampleRates() {
         Instant now = Instant.now();
-        double elapsedSec = (now.toEpochMilli() - prevTime.toEpochMilli()) / 1000.0;
+        double sec = (now.toEpochMilli() - prevTime.toEpochMilli()) / 1_000.0;
 
         long mCnt = mqttService.getSentCount();
-        long mBytes = mqttService.getSentBytes();
-        mqttRateCnt.set((long)((mCnt - prevMqttCount) / elapsedSec));
-        mqttRateBytes.set((long)((mBytes - prevMqttBytes) / elapsedSec));
-        prevMqttCount = mCnt; prevMqttBytes = mBytes;
+        mqttRateCnt.set((long) ((mCnt - prevMqttCnt) / sec));
+        prevMqttCnt = mCnt;
 
-        long rCnt = rabbitMqService.getSentCount();
-        long rBytes = rabbitMqService.getSentBytes();
-        rabbitRateCnt.set((long)((rCnt - prevRabbitCount) / elapsedSec));
-        rabbitRateBytes.set((long)((rBytes - prevRabbitBytes) / elapsedSec));
-        prevRabbitCount = rCnt; prevRabbitBytes = rBytes;
+        long rCnt = mqttToKafkaService.getRabbitReceivedCount();
+        rabbitRateCnt.set((long) ((rCnt - prevRabbitCnt) / sec));
+        prevRabbitCnt = rCnt;
+
+        long pCnt = mqttToKafkaService.getKafkaSentCount();
+        pipelineRateCnt.set((long) ((pCnt - prevPipelineCnt) / sec));
+        prevPipelineCnt = pCnt;
 
         long kCnt = kafkaService.getReceivedCount();
-        long kBytes = kafkaService.getReceivedBytes();
-        kafkaRateCnt.set((long)((kCnt - prevKafkaCount) / elapsedSec));
-        kafkaRateBytes.set((long)((kBytes - prevKafkaBytes) / elapsedSec));
-        prevKafkaCount = kCnt; prevKafkaBytes = kBytes;
+        kafkaRateCnt.set((long) ((kCnt - prevKafkaCnt) / sec));
+        prevKafkaCnt = kCnt;
 
         prevTime = now;
     }
 
-    // Rate getters
+    // getters for count rates only
     public long getMqttRateCount()    { return mqttRateCnt.get(); }
-    public long getMqttRateBytes()    { return mqttRateBytes.get(); }
     public long getRabbitRateCount()  { return rabbitRateCnt.get(); }
-    public long getRabbitRateBytes()  { return rabbitRateBytes.get(); }
     public long getPipelineRateCount(){ return pipelineRateCnt.get(); }
-    public long getPipelineRateBytes(){ return pipelineRateBytes.get(); }
     public long getKafkaRateCount()   { return kafkaRateCnt.get(); }
-    public long getKafkaRateBytes()   { return kafkaRateBytes.get(); }
 }

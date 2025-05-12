@@ -25,12 +25,6 @@ public class KafkaService {
         kafkaTemplate.send(topic, message);
     }
 
-//    @KafkaListener(topics = "${spring.kafka.topic}", containerFactory = "kafkaListenerContainerFactory")
-//    public void consumeMessage(String message) {
-//        receivedCount.incrementAndGet();
-//        receivedBytes.addAndGet(message.getBytes(StandardCharsets.UTF_8).length);
-//    }
-
     @KafkaListener(topics = "${spring.kafka.topic}", containerFactory = "kafkaListenerContainerFactory")
     public void consumeMessage(String message, Acknowledgment acknowledgment) {
         try {
