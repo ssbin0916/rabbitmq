@@ -5,15 +5,16 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.integration.mqtt.support.MqttHeaders;
+import org.springframework.integration.support.MessageBuilder;
+import org.springframework.messaging.Message;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
@@ -39,12 +40,9 @@ public class LoadTestService {
     // 미리 만들어둘 메시지 풀
     private List<String> preGenerated;
 
-    // 비동기 전송 전용 풀 (IO 바운드라면 코어×2~×4 정도)
-    private final ExecutorService sendPool =
-            Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 3);
-
     private LocalDateTime startTime;
     private final AtomicLong sendCount = new AtomicLong();
+    private final AtomicLong sendBytes = new AtomicLong();
 
     @PostConstruct
     public void init() throws Exception {
@@ -58,10 +56,10 @@ public class LoadTestService {
         preGenerated = new ArrayList<>(messagesPerBatch);
         Random rnd = new Random();
         for (int i = 0; i < messagesPerBatch; i++) {
-            Map<String,Object> row = new HashMap<>();
+            Map<String, Object> row = new HashMap<>();
             row.put("id", UUID.randomUUID().toString());
             for (int c = 1; c <= 199; c++) {
-                row.put("col"+c, rnd.nextDouble());
+                row.put("col" + c, rnd.nextDouble());
             }
             preGenerated.add(objectMapper.writeValueAsString(row));
         }
@@ -88,14 +86,11 @@ public class LoadTestService {
         // 비동기로만 던지고 리턴
         for (int i = 0; i < preGenerated.size(); i++) {
             final String payload = preGenerated.get(i);
-            sendPool.execute(() -> {
-                try {
-                    mqttService.sendMessage("test", payload);
-                    sendCount.incrementAndGet();
-                } catch (Exception e) {
-                    log.error("전송 실패", e);
-                }
-            });
+            Message<String> message = MessageBuilder.withPayload(payload)
+                    .setHeader(MqttHeaders.TOPIC, "test")
+                    .build();
+
+            mqttService.sendMessage(message);
         }
         long elapsed = System.currentTimeMillis() - batchStart;
         log.info("메시지 요청 던짐: {}개, scheduling 시간={}ms (누적 전송 요청={}건)",
@@ -116,9 +111,5 @@ public class LoadTestService {
 
     public boolean isTestEnabled() {
         return enabled;
-    }
-
-    public long getSentMessagesCount() {
-        return sendCount.get();
     }
 }

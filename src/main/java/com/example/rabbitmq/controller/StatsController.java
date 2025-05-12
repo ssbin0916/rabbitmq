@@ -16,9 +16,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class StatsController {
 
+
     private final MqttService mqttService;
     private final RabbitMqService rabbitMqService;
-    private final MqttToKafkaService pipelineService;
+    private final MqttToKafkaService mqttToKafkaService;
     private final KafkaService kafkaService;
     private final StatsCollector rates;
 
@@ -34,8 +35,8 @@ public class StatsController {
         m.put("mqtt.rate.bytes/s", rates.getMqttRateBytes());
 
         // RabbitMQ
-        m.put("rabbit.sent.count", rabbitMqService.getSentCount());
-        m.put("rabbit.sent.bytes", rabbitMqService.getSentBytes());
+        m.put("rabbit.sent.count", mqttToKafkaService.getRabbitReceivedCount());
+        m.put("rabbit.sent.bytes", mqttToKafkaService.getRabbitReceivedBytes());
         m.put("rabbit.rate.count/s", rates.getRabbitRateCount());
         m.put("rabbit.rate.bytes/s", rates.getRabbitRateBytes());
 
@@ -72,10 +73,10 @@ public class StatsController {
     @GetMapping("/pipeline")
     public Map<String, Long> pipelineStats() {
         return Map.of(
-                "receivedCount", pipelineService.getRabbitReceivedCount(),
-                "receivedBytes", pipelineService.getRabbitReceivedBytes(),
-                "sentCount",     pipelineService.getKafkaSentCount(),
-                "sentBytes",     pipelineService.getKafkaSentBytes()
+                "receivedCount", mqttToKafkaService.getRabbitReceivedCount(),
+                "receivedBytes", mqttToKafkaService.getRabbitReceivedBytes(),
+                "sentCount",     mqttToKafkaService.getKafkaSentCount(),
+                "sentBytes",     mqttToKafkaService.getKafkaSentBytes()
         );
     }
 
@@ -93,7 +94,7 @@ public class StatsController {
     public void resetAll() {
         mqttService.reset();
         rabbitMqService.reset();
-        pipelineService.reset();
+        mqttToKafkaService.reset();
         kafkaService.reset();
     }
 
@@ -112,7 +113,7 @@ public class StatsController {
     /** Pipeline 통계 초기화 */
     @PostMapping("/pipeline/reset")
     public void resetPipeline() {
-        pipelineService.reset();
+        mqttToKafkaService.reset();
     }
 
     /** Kafka 통계 초기화 */

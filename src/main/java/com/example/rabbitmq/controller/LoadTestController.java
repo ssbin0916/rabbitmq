@@ -45,8 +45,7 @@ public class LoadTestController {
     public ResponseEntity<Map<String, Object>> getLoadTestStatus() {
         Map<String, Object> status = new HashMap<>();
         status.put("testEnabled", loadTestService.isTestEnabled());
-        status.put("sentMessagesCount", loadTestService.getSentMessagesCount());
-        
+
         return ResponseEntity.ok(status);
     }
 }

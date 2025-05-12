@@ -4,6 +4,7 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.integration.annotation.MessagingGateway;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.core.MessageProducer;
@@ -12,8 +13,10 @@ import org.springframework.integration.mqtt.core.MqttPahoClientFactory;
 import org.springframework.integration.mqtt.inbound.MqttPahoMessageDrivenChannelAdapter;
 import org.springframework.integration.mqtt.outbound.MqttPahoMessageHandler;
 import org.springframework.integration.mqtt.support.DefaultPahoMessageConverter;
+import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
 public class MqttConfig {
@@ -44,44 +47,43 @@ public class MqttConfig {
         options.setAutomaticReconnect(true);
         options.setConnectionTimeout(30);
 
-        options.setMaxInflight(5000);
+        options.setMaxInflight(10000);
 
         factory.setConnectionOptions(options);
         return factory;
     }
 
     @Bean
-    public MessageChannel mqttInputChannel() {
-        return new DirectChannel();
+    @ServiceActivator(inputChannel = "mqttExecutorChannel")
+    public MessageHandler mqttPahoMessageHandler(MqttPahoClientFactory factory) {
+        MqttPahoMessageHandler handler =
+                new MqttPahoMessageHandler(clientId + "-out", factory);
+        handler.setAsync(true);
+        handler.setDefaultQos(qos);
+        handler.setCompletionTimeout(5_000);
+
+        // **여기**서 String payload → byte[] 로 변환해 줄 컨버터를 등록
+        DefaultPahoMessageConverter converter = new DefaultPahoMessageConverter();
+        // String 을 그대로 payload 로 쓰려면
+        converter.setPayloadAsBytes(false);
+        handler.setConverter(converter);
+
+        return handler;
     }
 
     @Bean
-    public MessageChannel mqttOutboundChannel() {
-        return new DirectChannel();
+    public ThreadPoolTaskExecutor mqttExecutor() {
+        ThreadPoolTaskExecutor tx = new ThreadPoolTaskExecutor();
+        tx.setCorePoolSize(20);
+        tx.setMaxPoolSize(50);
+        tx.setQueueCapacity(5_000);
+        tx.setThreadNamePrefix("mqtt-send-");
+        tx.initialize();
+        return tx;
     }
 
-    @Bean
-    public MessageProducer inbound() {
-        MqttPahoMessageDrivenChannelAdapter adapter =
-                new MqttPahoMessageDrivenChannelAdapter(clientId + "-in", mqttClientFactory(), topic);
-
-        adapter.setCompletionTimeout(5000);
-        adapter.setConverter(new DefaultPahoMessageConverter());
-        adapter.setQos(qos);
-        adapter.setOutputChannel(mqttInputChannel());
-        return adapter;
-    }
-
-    @Bean
-    @ServiceActivator(inputChannel = "mqttOutboundChannel")
-    public MessageHandler mqttOutbound() {
-        MqttPahoMessageHandler messageHandler =
-                new MqttPahoMessageHandler(clientId + "-out", mqttClientFactory());
-
-        messageHandler.setAsync(false);
-        messageHandler.setDefaultTopic(topic);
-        messageHandler.setDefaultQos(qos);
-
-        return messageHandler;
+    @MessagingGateway(defaultRequestChannel = "mqttExecutorChannel")
+    public interface MqttGateway {
+        void sendToMqtt(Message<String> msg);
     }
 }

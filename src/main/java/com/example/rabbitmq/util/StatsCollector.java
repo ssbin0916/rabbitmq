@@ -18,27 +18,29 @@ public class StatsCollector {
 
     private final MqttService mqttService;
     private final RabbitMqService rabbitMqService;
-    private final MqttToKafkaService pipelineService;
+    private final MqttToKafkaService mqttToKafkaService;
     private final KafkaService kafkaService;
 
-    // 직전 스냅샷
     private long prevMqttCount = 0, prevMqttBytes = 0;
     private long prevRabbitCount = 0, prevRabbitBytes = 0;
     private long prevPipelineCount = 0, prevPipelineBytes = 0;
     private long prevKafkaCount = 0, prevKafkaBytes = 0;
     private Instant prevTime = Instant.now();
 
-    // 1초마다 갱신
-    private AtomicLong mqttRateCnt = new AtomicLong(), mqttRateBytes = new AtomicLong();
-    private AtomicLong rabbitRateCnt = new AtomicLong(), rabbitRateBytes = new AtomicLong();
-    private AtomicLong pipelineRateCnt = new AtomicLong(), pipelineRateBytes = new AtomicLong();
-    private AtomicLong kafkaRateCnt = new AtomicLong(), kafkaRateBytes = new AtomicLong();
+    private final AtomicLong mqttRateCnt = new AtomicLong();
+    private final AtomicLong mqttRateBytes = new AtomicLong();
+    private final AtomicLong rabbitRateCnt = new AtomicLong();
+    private final AtomicLong rabbitRateBytes = new AtomicLong();
+    private final AtomicLong pipelineRateCnt = new AtomicLong();
+    private final AtomicLong pipelineRateBytes = new AtomicLong();
+    private final AtomicLong kafkaRateCnt = new AtomicLong();
+    private final AtomicLong kafkaRateBytes = new AtomicLong();
 
     @PostConstruct
     public void init() {
         prevMqttCount = mqttService.getSentCount();
         prevMqttBytes = mqttService.getSentBytes();
-        prevRabbitCount = rabbitMqService.getSentCount();
+        prevRabbitCount = mqttToKafkaService.getRabbitReceivedCount();
         prevRabbitBytes = rabbitMqService.getSentBytes();
         prevKafkaCount = kafkaService.getReceivedCount();
         prevKafkaBytes = kafkaService.getReceivedBytes();

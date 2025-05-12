@@ -1,12 +1,9 @@
 package com.example.rabbitmq.service;
 
+import com.example.rabbitmq.config.MqttConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.integration.mqtt.support.MqttHeaders;
-import org.springframework.integration.support.MessageBuilder;
 import org.springframework.messaging.Message;
-import org.springframework.messaging.MessageChannel;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -17,48 +14,15 @@ import java.util.concurrent.atomic.AtomicLong;
 @RequiredArgsConstructor
 public class MqttService {
 
-    private final MessageChannel mqttOutboundChannel;
-    private final ThreadPoolTaskExecutor mqttExecutor;
+    private final MqttConfig.MqttGateway mqttGateway;
     private final AtomicLong sentCount = new AtomicLong();
     private final AtomicLong sentBytes = new AtomicLong();
 
-//    public void sendMessage(String topic, String payload) {
-//        mqttExecutor.execute(() -> {
-//            try {
-//                var msg = MessageBuilder
-//                        .withPayload(payload)
-//                        .setHeader(MqttHeaders.TOPIC, topic)
-//                        .build();
-//                mqttOutboundChannel.send(msg);
-//
-//                long count = sentCount.incrementAndGet();
-//                long bytes = sentBytes.addAndGet(payload.getBytes(StandardCharsets.UTF_8).length);
-//                if (count % 1000 == 0) {
-//                    log.info("[MQTT] 누적 전송: {}건, {} bytes", count, bytes);
-//                }
-//            } catch (Exception e) {
-//                log.error("[MQTT] 비동기 전송 에러: topic={}, error={}", topic, e.toString());
-//            }
-//        });
-//    }
-
-    public void sendMessage(String topic, String payload) {
-        mqttExecutor.execute(() -> {
-            try {
-                Message<String> msg = MessageBuilder.withPayload(payload)
-                        .setHeader(MqttHeaders.TOPIC, topic)
-                        .build();
-                mqttOutboundChannel.send(msg);
-                long bytes = payload.getBytes(StandardCharsets.UTF_8).length;
-                sentCount.incrementAndGet();
-                sentBytes.addAndGet(bytes);
-
-            } catch (Exception ex) {
-                log.error("[MQTT] 전송 실패: {}", ex.toString());
-            }
-        });
+    public void sendMessage(Message<String> message) {
+        mqttGateway.sendToMqtt(message);
+        sentCount.incrementAndGet();
+        sentBytes.addAndGet(message.getPayload().getBytes(StandardCharsets.UTF_8).length);
     }
-
 
     public long getSentCount() {
         return sentCount.get();
