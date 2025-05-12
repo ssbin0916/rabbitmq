@@ -1,54 +1,49 @@
+# ┌───────────────────────────────────────────────────────────────────────────┐
+# │                          application.yml                                 │
+# └───────────────────────────────────────────────────────────────────────────┘
+
 spring:
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
-    exchange: amq.topic
-    routing-key: test.#
-    queue: test
+    host: localhost           # RabbitMQ 브로커 호스트
+    port: 5672                # RabbitMQ 브로커 포트
+    username: guest           # 인증 사용자 이름
+    password: guest           # 인증 비밀번호
+    exchange: amq.topic       # 사용할 Exchange 이름
+    routing-key: test.#       # 바인딩할 라우팅 키 패턴
+    queue: test               # 소비할 Queue 이름
 
   kafka:
-    bootstrap-servers: localhost:9092
-    topic: kafka-test-topic
+    bootstrap-servers: localhost:9092   # Kafka 클러스터 주소
+    topic: kafka-test-topic             # 기본 프로듀싱/컨슈밍 토픽
     consumer:
-      group-id: kafka-group
-      auto-offset-reset: earliest
-#      enable-auto-commit: true
-#      auto-commit-interval: 100
+      group-id: kafka-group             # 컨슈머 그룹 ID
+      auto-offset-reset: earliest       # Offset 없을 때 처음부터 읽기
+#      enable-auto-commit: true         # (비활성) 자동 커밋 사용 여부
+#      auto-commit-interval: 100       # (비활성) 자동 커밋 주기(ms)
 
 server:
-  port: 8080
+  port: 8080                            # Spring Boot 내장 톰캣 포트
   jackson:
-    date-format: yyyy-MM-dd'T'HH:mm:ss
-    time-zone: Asia/Seoul
+    date-format: yyyy-MM-dd'T'HH:mm:ss  # JSON 직렬화 시 날짜 형식
+    time-zone: Asia/Seoul               # Jackson 출력 타임존
 
 logging:
   level:
-    root: INFO
-    org.springframework: INFO
-    com.example.rabbitmq: DEBUG
-    org.hibernate.SQL: DEBUG
+    root: INFO                          # 기본 로깅 레벨
+    org.springframework: INFO           # Spring 프레임워크 로깅 레벨
+    com.example.rabbitmq: DEBUG         # 애플리케이션 패키지 로깅 레벨
+    org.hibernate.SQL: DEBUG            # Hibernate SQL 로그(쿼리) 활성화
 
 load:
   test:
-    enabled: false
-    messages-per-batch: 1000
-    batch-interval: 200
-    duration-seconds: 60
+    enabled: false                      # 로드테스트 모드 on/off
+    messages-per-batch: 1000            # 배치당 메시지 수
+    batch-interval: 200                 # 배치 전송 간격(ms)
+    duration-seconds: 60                # 테스트 총 지속 시간(초)
 
 mqtt:
-  broker-url: tcp://localhost:1883
-  client-id: client
-  topic: test
-  qos: 1
-  clean-session: false
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: metrics, prometheus
-  endpoint:
-    metrics:
-      enabled: true
+  broker-url: tcp://localhost:1883     # MQTT 브로커 접속 URL
+  client-id: client                     # MQTT 클라이언트 ID
+  topic: test                           # MQTT 퍼블리시 토픽
+  qos: 1                                # MQTT QoS 레벨 (0|1|2)
+  clean-session: false                  # 세션 유지 여부
